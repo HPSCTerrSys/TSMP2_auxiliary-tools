@@ -5,12 +5,18 @@
 Visualisation template for plotting ICON data on its icosahedral grid on a map
 
 Purpose:
-This is a template and demonstrator on how TSMP2 ICON or eCLM data on its native 
-simulation grid can be plotted with a rotated map projection as a basis. E.g., 
-ICON over a EURO-CORDEX model domain. Can be used as a basis.
+Visualisation template and demonstrator for plotting ICON data on its 
+icosahedral native grid on a map using matplotlib and cartopy. This is a 
+template and demonstrator on how TSMP2 ICON (or eCLM) data on its native 
+simulation grid can be plotted with a rotated map projection as a basis, 
+including proper colorbar, etc. Data is plotted without distortion, 
+either vectorized or rasterized, the map edges align with the data. The 
+tool is currently configured to plot 3km or 12km horizontal resolution 
+ICON data (R13B07, R13B05) over a EURO-CORDEX EUR-12 model domain. A
+recommendation for various use cases is given at the end.
 
 Inputs:
-- ICON main grid file
+- ICON "main grid file"
 - External parameter file
 - Rotated pole longitude and latitude
 All based on the Zonda ICON Grid and EXTPAR Interface. Using the "europe011" 
@@ -163,9 +169,11 @@ def main():
     cmapDiscr = plt.get_cmap('terrain', 50)
     levelsVals = (np.arange(51)*50)
 
-    # for an all-vectorized option just "rasterized=False", need to test
-    # if you have any hairline issue, rasterize the data triangles and control 
-    # the quality via the DPIs of the output
+    # for an all-vectorized option just "rasterized=False", you need to test
+    # if you have any hairline issues, rasterize the data triangles and control 
+    # the quality via the DPIs of the output helps in this case
+    # in a PDF file, this way only the data layer in the map is rasterized
+    # data is masked here with the land-ocean mask
     pdo = ax1.tripcolor(triang, 
         facecolors=np.ma.masked_where(
         ds['FR_LAND'][:].isel(cell=mask).values <= 0.5, 
@@ -179,7 +187,8 @@ def main():
     #      ds['topography_c'][:].isel(cell=mask).values, 
     #      cmap=cmapDiscr, levels=levelsVals, transform=crs_data)
 
-    # setting map extend w/ rot. coords, as projection is in rot. coords
+    # setting map extend w/ rot. coords, as the map projection is in rot. coords
+    # no triangle (no matter how coarse the resolution) is cut at the map edge
     plt.xlim(vlon_rot_min, vlon_rot_max)
     plt.ylim(vlat_rot_min, vlat_rot_max)
 
@@ -188,43 +197,54 @@ def main():
     cb.ax.tick_params(labelsize=8)
     cb.set_label('Surface altitude [m]', fontsize=9)
 
-    # some recommendations from testing:
-    # "S(mall)": 5-inch plot (is eventually smaller)
+    # There is an interplay of (i) format, (ii) figure size, (iii) rasterized or
+    # vectorized data plotting (see "rasterized" keyword), (iv) the graphics 
+    # file plotting resolution setting (dpi) 
+    # Some recommendations from testing with 3km R13B07 and 12km R13B05 ICON
+    # grids over the EUR-12 (formerly EUR-11) domain:
+    # "S(mall)": 5-inch plot (eventually a slightly smaller plot is generated)
     # "L(arge)": 10-inch plot
-    # w/ 3km @5inch: 
-    # - PNG restarized=True/False @3000dpi does not matter RE quality+size, 
-    #   processing speed?
-    # - PDF restarized=True/False @3000dpi matters RE quality: no hairlines, no 
-    #   viewer speedup issue, slightly less edge precision,+size: 6MB vs 47MB, 
-    #   processing speed? the hige filesize difference matters here most
-    # - PDF/PNG restarized=True @1500dpi: not sufficient in terms of quality
-    # --> 5inch normal plot, 3km: 
-    #     w/ png: 3000dpi needed, rasterized does not matter 
-    #     w/ pdf: 3000dpi needed + rasterized
-    # w/ 12km @5inch:
-    # - execution speed is about 30sec
-    # - PNG restarized=True/False @2000dpi does not matter RE quality+size, 
-    #   processing speed is the same
-    # - PDF restarized=True/False @2000dpi matters RE quality: no hairlines, no 
-    #   viewer speedup issue, slightly less edge precision,+size: 2MB vs 3MB, 
-    #   processing speed is the same
-    # --> 5inch normal plot, 12km: 
-    #     w/ png: 2000dpi OK, rasterized T/F does not matter 
-    #     w/ pdf: 2000dpi OK, rasterized T is slightly smaller tahn png, 
-    #             quality is OK
+    # w/ 3km with 5inch figsize: 
+    # - PNG output: restarized=True/False @3000dpi at does not matter RE 
+    #   quality or file size, it is the same, processing speed was not checked,
+    #   the PNG files become relatively large, >10MB, easily
+    # - PDF output: restarized=True/False @3000dpi matters a lot; RE quality: 
+    #   rasterized plots show no hairlines between the triangles, there is no 
+    #   viewer issue (slow builtup due to many geomatric objects) when 
+    #   displaying the PDF file; there is slightly less edge precision, depdning
+    #   on the dpi; the biggest difference is with the file size, even at very 
+    #   high plotting resolution (dpi), the rasterized file yield 6MB vs 47MB of
+    #   the all vectorized file 
+    # - PDF/PNG output with restarized=True and lower plotting resolution of 
+    #   1500dpi for further file size reduction is not sufficient in terms of 
+    #   quality, triangles are then blurred
+    # - conclusion:
+    #   w/ PNG: 3000dpi needed, rasterized setting does not matter 
+    #   w/ PDF: 3000dpi needed + rasterized=True
+    # w/ 12km with 5inch figsize:
+    # - execution speed is about 30sec in all cases
+    # - PNG output: restarized=True/False @2000dpi does not matter RE plot 
+    #   quality or file size, 
+    # - PDF output: restarized=True/False @2000dpi matters; RE quality: as with
+    #   3km, but the file size does not differ too much, 2MB vs 3MB, 
+    # - conclusion:
+    #   w/ PNG: 2000dpi is sufficient, rasterized=T/F does not matter 
+    #   w/ PDF: 2000dpi is sufficient, rasterized=T is slightly smaller than the
+    #   PNG file, the quality is OK, no artifacts
     # in general:
     # --> rasterized=False and PDF always has the highest precision, albeit with 
-    #     the hairlines and too large file sizes
-    # --> large plot sizes: lower dpi png and higher dpi w/ rasterized may work 
-    #     well with OK filesize
-    # --> with 12km the rastereized pdf without size issues may be improved 
-    #     at no cost on file size by going up to 3000dpi 
-    # --> png is always OK, but has large filesize and other file format related 
-    #     properties; filesizes is about x2 from png and quality is not much 
-    #     better
-    # ==> if pdf is OK and extreme geometric precision is not an issue use 
+    #     the hairlines and too large file sizes, irrespective of the dpi
+    # --> large figsizes: lower dpi with PNGs and higher dpi w/ PDFs and 
+    #     rasterized=T may work well with an OK filesize
+    # --> with 12km the rasterized pdf may be improved further with little 
+    #     impact on the file size by plotting with 3000dpi 
+    # --> PNG output always OK, but has large filesize and other file format
+    #     related specific properties; file sizes is about x2 as compared to 
+    #     PDFs the quality of highres PNG is not much better than with a  
+    #     rasterized PDF
+    # ==> if PDF is OK and extreme geometric precision is not an issue use 
     #     rastereized=True + high dpi numbers, like 3000dpi for 3km and 2000dpi 
-    #     for 12km 
+    #     for 12km
     fig1.savefig('./map_2d_icon_triGrid_extpar-12km-EUR11-orog_allVec_S_2000dpi.pdf', 
                  bbox_inches='tight', pad_inches=0.1, dpi=2000)
     fig1.savefig('./map_2d_icon_triGrid_extpar-12km-EUR11-orog_allVec_S_2000dpi.png', 

@@ -2,12 +2,12 @@
 # coding: utf-8
 
 '''
-Visualisation testing nd demo tool to plot data on triangular grids
+Visualisation testing and demo tool on how to plot data on triangular grids
 
 Purpose:
-Use this as a basis ofr further vis tools, when, e.g. ICON data is to be plotted
-on its native grid. Deliberately hardcoded and many comments, need to uncomment.
-Many explanations added during exploration of the fucntionalities.
+Use this as a basis for further vis tools, when, e.g. ICON data is to be plotted
+on its native grid. Deliberately lots of hardcoding and many comments. Many 
+explanations added during exploration of the functionalities.
 '''
 
 import time, os, sys
