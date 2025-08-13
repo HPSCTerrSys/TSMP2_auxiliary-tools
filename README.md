@@ -1,0 +1,5 @@
+# Auxiliary tools for TSMP2
+
+This is a collection of auxiliary software tools for the [TSMP2 model system](https://github.com/HPSCTerrSys/TSMP2), e.g., for handling, displaying, etc. data on the original ICON icosahedral grid, etc., complimentary or based on existing tools. The tools serve primarily purposes of the TSMP2 core development and users teams within [HPSC TerrSys](https://github.com/HPSCTerrSys).
+
+[visualization_icon_2d-map_triangular-grid](visualization_icon_2d-map_triangular-grid/): A collection of Python scripts (using matplotlib, cartopy, xarray, numpy) to visualize TSMP2 model output (from ICON or eCLM) on its native icosahedral (triangular) grid on a map with some examples. A special case is considered where the model is run in a liimited area mode (LAM) setup over Europe, covering the EURO-CORDEX pan-European model domain as defined by a rotated longitude-latitude grid.
