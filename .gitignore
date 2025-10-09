@@ -2,3 +2,6 @@ data_test_geo.*
 *bak*
 *examples*
 test.pdf
+.DS_Store
+dev
+*code-workspace*
