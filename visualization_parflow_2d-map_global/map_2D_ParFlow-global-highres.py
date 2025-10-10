@@ -25,7 +25,8 @@ adjusted with each other. Also the viewer makes a difference.
 
 Limitations:
 Currently only Fig3 from Kollet et al., plottype='Sr', is implemented, other
-plots will follow. 
+plots will follow.
+May need manual code edits, especially in `main`. 
 
 Operating environment:
 - locally with conda forge env (tested), or
@@ -476,7 +477,7 @@ def main():
 
     # add: , interactiveplot=False
     pn_fn_image_output = plot_2D_map(data_obj, plottype="Sr", mapfocus="global", size="pagewidth",
-        pn_out="/p/project/cjjsc39/jjsc3900/tmp.visualization_parflow_2d-map_global", fn_out="test", fileformat="pdf")
+        pn_out="./", fn_out="test", fileformat="pdf")
 
     print('exec wallclock time plotting  =  %0.3f s' % (time.time() - time_intermediate)) 
 
