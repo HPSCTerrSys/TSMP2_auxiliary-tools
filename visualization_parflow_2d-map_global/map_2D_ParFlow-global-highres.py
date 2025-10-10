@@ -30,7 +30,7 @@ May need manual code edits, especially in `main`.
 
 Operating environment:
 - locally with conda forge env (tested), or
-- JSC/JURECA frontnode (tested) (JSC/JUWELS should also work), source this environment initialisation file:
+- JSC/JURECA JSC/JUWELS frontnodes (tested), source this environment initialisation file:
   https://icg4geo.icg.kfa-juelich.de/Organisation/hpc_it_dev_data_howtos-and-bestpractice/hpc_scientific_operating_environments/-/blob/main/loadenv.JURECA-DC_JUWELS_2023_GCC-OpenMPI_Std-Py-AI.ini`
 '''
 
