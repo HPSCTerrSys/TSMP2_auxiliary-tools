@@ -5,7 +5,7 @@
 Visualisation of global ParFlow model input and output on a map.
 
 Purpose:
-This script combines the visualisation for the different figures in 
+This script combines the plotting scripts for the different figures in 
 Kollet et al. "Global groundwater modeling: Proof-of-concept of 3D 
 variably saturated flow simulation at km-resolution" in JHX for further
 reuse and adjustment. 
