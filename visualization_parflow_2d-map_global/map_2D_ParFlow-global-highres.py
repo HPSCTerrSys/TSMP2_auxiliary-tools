@@ -106,37 +106,37 @@ class simAuxData:
         Not all datasets provide usable lon/lat information, then it is not read.
     """
 
-    sim_dir: str
-    sim_file: str
-    sim_varname: str
-    sim_resample: int
-    sim_data: np.ndarray = field(init=False)
-    mask_dir: str
-    mask_file: str
-    mask_varname: str
-    mask_resample: int
-    mask_data: np.ndarray = field(init=False)
-    permafrost_dir: str
-    permafrost_file: str
-    permafrost_varname: str
-    permafrost_data: np.ndarray = field(init=False)
-    permafrost_lon: np.ndarray = field(init=False)
-    permafrost_lat: np.ndarray = field(init=False)
-    karst_dir: str
-    karst_file: str
-    karst_varname: str
-    karst_resample: int
-    karst_data: np.ndarray = field(init=False)
-    lon: np.ndarray = field(init=False)
-    lat: np.ndarray = field(init=False)
+    sim_var1_dir: str
+    sim_var1_file: str
+    sim_var1_varname: str
+    sim_var1_resample: int
+    sim_var1_data: np.ndarray = field(init=False)
+    mask_landsea_dir: str
+    mask_landsea_file: str
+    mask_landsea_varname: str
+    mask_landsea_resample: int
+    mask_landsea_data: np.ndarray = field(init=False)
+    mask_permafrost_dir: str
+    mask_permafrost_file: str
+    mask_permafrost_varname: str
+    mask_permafrost_data: np.ndarray = field(init=False)
+    mask_permafrost_lon: np.ndarray = field(init=False)
+    mask_permafrost_lat: np.ndarray = field(init=False)
+    mask_karst_dir: str
+    mask_karst_file: str
+    mask_karst_varname: str
+    mask_karst_resample: int
+    mask_karst_data: np.ndarray = field(init=False)
+    sim_lon: np.ndarray = field(init=False)
+    sim_lat: np.ndarray = field(init=False)
 
     def __post_init__(self):
-        self.sim_data = self._read_sim_data_proc(self.sim_dir, self.sim_file, self.sim_varname, self.sim_resample)
-        self.mask_data = self._read_mask(self.mask_dir, self.mask_file, self.mask_varname, self.mask_resample)
-        self.permafrost_data, self.permafrost_lon, self.permafrost_lat = self._read_permafrost(self.permafrost_dir, self.permafrost_file, self.permafrost_varname)
-        self.karst_data, self.lon, self.lat = self._read_karst(self.karst_dir, self.karst_file, self.karst_varname, self.karst_resample)
+        self.sim_var1_data = self._read_sim_varX(self.sim_var1_dir, self.sim_var1_file, self.sim_var1_varname, self.sim_var1_resample)
+        self.mask_landsea_data = self._read_mask_landsea(self.mask_landsea_dir, self.mask_landsea_file, self.mask_landsea_varname, self.mask_landsea_resample)
+        self.mask_permafrost_data, self.mask_permafrost_lon, self.mask_permafrost_lat = self._read_mask_permafrost(self.mask_permafrost_dir, self.mask_permafrost_file, self.mask_permafrost_varname)
+        self.mask_karst_data, self.sim_lon, self.sim_lat = self._read_mask_karst(self.mask_karst_dir, self.mask_karst_file, self.mask_karst_varname, self.mask_karst_resample)
   
-    def _read_sim_data_proc(self, pn: str, fn: str, varname: str, regr: int) -> np.ndarray:
+    def _read_sim_varX(self, pn: str, fn: str, varname: str, regr: int) -> np.ndarray:
 
         #print('----------------------------------------')
         ds = xr.open_dataset(pn+"/"+fn)    
@@ -156,7 +156,7 @@ class simAuxData:
 
         return data
 
-    def _read_mask(self, pn: str, fn: str, varname: str, regr: int) -> np.ndarray:
+    def _read_mask_landsea(self, pn: str, fn: str, varname: str, regr: int) -> np.ndarray:
 
         # this is a normal 0 1 mask, nothing with masked array and nothing with 0-1, but 0,1
         ds_mask = xr.open_dataset(pn+"/"+fn)
@@ -182,7 +182,7 @@ class simAuxData:
 
         return mask
 
-    def _read_permafrost(self, pn: str, fn: str, varname: str) -> np.ndarray:
+    def _read_mask_permafrost(self, pn: str, fn: str, varname: str) -> np.ndarray:
 
         #print('----------------------------------------')
         ds_mask = xr.open_dataset(pn+"/"+fn, decode_times=False)
@@ -200,7 +200,7 @@ class simAuxData:
 
         return mask, lon, lat
 
-    def _read_karst(self, pn: str, fn: str, varname: str, regr: int) -> np.ndarray:
+    def _read_mask_karst(self, pn: str, fn: str, varname: str, regr: int) -> np.ndarray:
 
         #print('----------------------------------------')
         ds_mask = xr.open_dataset(pn+"/"+fn, decode_times=False)
@@ -295,19 +295,19 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
     """
 
     # sim data, ParFlow sim data
-    data = data_obj.sim_data[:, :]
-    data_lon = mask2_lon = mask4_lon = data_obj.lon[:]
-    data_lat = mask2_lat = mask4_lat = data_obj.lat[:]
+    data = data_obj.sim_var1_data[:, :]
+    data_lon = mask2_lon = mask4_lon = data_obj.sim_lon[:]
+    data_lat = mask2_lat = mask4_lat = data_obj.sim_lat[:]
     # permafrost, ISIMIP data, coarse resolution
-    mask1 = data_obj.permafrost_data[:, :]
-    mask1_lon = data_obj.permafrost_lon[:] 
-    mask1_lat = data_obj.permafrost_lat[:] 
+    mask1 = data_obj.mask_permafrost_data[:, :]
+    mask1_lon = data_obj.mask_permafrost_lon[:] 
+    mask1_lat = data_obj.mask_permafrost_lat[:] 
     # land ocean lake, derived from ParFlow external paremeter files
-    mask3 = data_obj.mask_data[:, :]
+    mask3 = data_obj.mask_landsea_data[:, :]
     # glacier, derived from shapefile, here for legacy and consistency
     mask2 = mask3[:, :]
     # karst rock 
-    mask4 = data_obj.karst_data[:, :]
+    mask4 = data_obj.mask_karst_data[:, :]
     #sys.exit()
 
     # interactive plotting
@@ -473,7 +473,7 @@ def main():
     time_intermediate = time.time()
     print('exec wallclock time reading and processing =  %0.3f s' % (time_intermediate - time_start)) 
 
-    #sys.exit()
+    sys.exit()
 
     # add: , interactiveplot=False
     pn_fn_image_output = plot_2D_map(data_obj, plottype="Sr", mapfocus="global", size="pagewidth",
