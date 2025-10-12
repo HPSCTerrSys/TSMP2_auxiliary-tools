@@ -5,3 +5,4 @@ test.pdf
 .DS_Store
 dev
 *code-workspace*
+tmp
