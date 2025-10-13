@@ -12,7 +12,7 @@ reuse and adjustment.
 
 Inputs:
 - Locally stored compilation of global datasets.
-- ParFlow simulation results.
+- ParFlow simulation results and diagnostics. Differ in netCDF structure and attributes.
 - ParFlow external parameter files.
 - Additional data from external sources: glacier mask, permafrost mask.
 
@@ -111,6 +111,11 @@ class simAuxData:
     sim_var1_varname: str
     sim_var1_resample: int
     sim_var1_data: np.ndarray = field(init=False)
+    sim_var2_dir: str
+    sim_var2_file: str
+    sim_var2_varname: str
+    sim_var2_resample: int
+    sim_var2_data: np.ndarray = field(init=False)
     mask_landsea_dir: str
     mask_landsea_file: str
     mask_landsea_varname: str
@@ -131,17 +136,18 @@ class simAuxData:
     sim_lat: np.ndarray = field(init=False)
 
     def __post_init__(self):
-        self.sim_var1_data = self._read_sim_varX(self.sim_var1_dir, self.sim_var1_file, self.sim_var1_varname, self.sim_var1_resample)
+        self.sim_var1_data = self._read_sim_var1(self.sim_var1_dir, self.sim_var1_file, self.sim_var1_varname, self.sim_var1_resample)
+        self.sim_var2_data = self._read_sim_var2(self.sim_var2_dir, self.sim_var2_file, self.sim_var2_varname, self.sim_var2_resample)
         self.mask_landsea_data = self._read_mask_landsea(self.mask_landsea_dir, self.mask_landsea_file, self.mask_landsea_varname, self.mask_landsea_resample)
         self.mask_permafrost_data, self.mask_permafrost_lon, self.mask_permafrost_lat = self._read_mask_permafrost(self.mask_permafrost_dir, self.mask_permafrost_file, self.mask_permafrost_varname)
         self.mask_karst_data, self.sim_lon, self.sim_lat = self._read_mask_karst(self.mask_karst_dir, self.mask_karst_file, self.mask_karst_varname, self.mask_karst_resample)
   
-    def _read_sim_varX(self, pn: str, fn: str, varname: str, regr: int) -> np.ndarray:
+    def _read_sim_var1(self, pn: str, fn: str, varname: str, regr: int) -> np.ndarray:
 
-        #print('----------------------------------------')
         ds = xr.open_dataset(pn+"/"+fn)    
         if regr == 0:
-            data = ds[varname].values
+            #data = ds[varname].values
+            data = ds[varname].isel(z=0, time=0).values
         if regr == 1:
             # resample, factor 4 along x and y axes
             # align the number of datapoints with the nnumber of pixels to print
@@ -153,6 +159,22 @@ class simAuxData:
 
         #print('min', np.nanmin(data))
         #print('max', np.nanmax(data))
+
+        return data
+
+    def _read_sim_var2(self, pn: str, fn: str, varname: str, regr: int) -> np.ndarray:
+
+        ds = xr.open_dataset(pn+"/"+fn)    
+        if regr == 0:
+            data = ds[varname].values
+        if regr == 1:
+            # resample, factor 4 along x and y axes
+            # align the number of datapoints with the nnumber of pixels to print
+            # data contains NaN
+            data = ds[varname]
+            datac = data.coarsen(nx=4, ny=4, boundary='exact', side='left').mean()
+            del data
+            data = datac.values
 
         return data
 
@@ -466,6 +488,7 @@ def main():
 
     # create dataclass holding all relevant datasets, for code 
     data_obj = simAuxData(dir_data+"/"+"plotdata_manuscript_SKo_links", "satur1x1.nc", "saturation", 1,
+                      dir_data+"/"+"plotdata_manuscript_SKo_links", "wtd1x1.nc", "wtd", 1,
                       dir_data+"/"+"plotdata_manuscript_SKo_links", "output_mask1x1.nc", "mask", 1,
                       dir_data+"/"+"masking_permafrost_isimip", "isimip2b_clm45_permafrost_mask_2005_3m.nc", "mask",
                       dir_data+"/"+"masking_carst-glaciated_indicator-gleeson", "global_gleeson_porosity_008333.nc", "Gleeson", 1)
