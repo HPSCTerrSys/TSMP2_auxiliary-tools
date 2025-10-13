@@ -15,24 +15,33 @@ Inputs:
 - ParFlow simulation results and diagnostics. Differ in netCDF structure and attributes.
 - ParFlow external parameter files.
 - Additional data from external sources: glacier mask, permafrost mask.
+- All data is stored here: `/p/data1/slts/shared_data/collection_ParFlow-global_misc-sources`
 
 Ouputs:
 - Image files
+- Examples: `/p/data1/slts/shared_data/collection_ParFlow-global_misc-sources/example_plots`
+
+Usage:
+`python3 map_2D_ParFlow-global-highres.py`
 
 Notes:
 Plot size, data set size in grid elements, map scale, dpi, image file format are
 adjusted with each other. Also the viewer makes a difference.
-- Fig2 Reff + global -- ongoing implementation
+The following combinations are implemented:
+- Fig1 hydrofacies + global
+- Fig2 Reff + global
 - Fig3 Sr + global
 - Fig4a WTD + global
 - Fig4b WTD + southAmerica1
-- Fig4b_poster WTD + southAmerica2 -- some poster vis, less map content
+- Fig poster WTD + southAmerica2 -- some poster vis, less map content
 - Fig EoCoE WTD + europe -- some website vis, less map content
+Total runtime about 4min.
 
 Limitations:
-Currently figures 3, 4a, 4b from Kollet et al. are implemented. 
-Other plots will follow.
 May need manual code edits, especially in `main`. 
+Shape-file is not yet part of the data object.
+"fullres" size not yet implemented.
+Adjustable resampling not yet implemented.
 
 Operating environment:
 - locally with conda forge env (tested), or
@@ -69,7 +78,7 @@ __copyright__ = "Copyright (c) 2025, https://www.fz-juelich.de (FZJ)"
 __license__ = "MIT"
 __version__ = "1.0.0"
 __date__ = "2025-10-13"
-__status__ = "Beta"
+__status__ = "Production"
 __credits__ = [
     "Stefan KOLLET",
     "Bibi NAZ",
@@ -145,6 +154,11 @@ class simAuxData:
     forcing_var1_varname: str
     forcing_var1_resample: int
     forcing_var1_data: np.ndarray = field(init=False)
+    extpar_var1_dir: str
+    extpar_var1_file: str
+    extpar_var1_varname: str
+    extpar_var1_resample: int
+    extpar_var1_data: np.ndarray = field(init=False)
 
     def __post_init__(self):
         self.sim_var1_data = self._read_sim_var1(self.sim_var1_dir, self.sim_var1_file, self.sim_var1_varname, self.sim_var1_resample)
@@ -153,6 +167,7 @@ class simAuxData:
         self.mask_permafrost_data, self.mask_permafrost_lon, self.mask_permafrost_lat = self._read_mask_permafrost(self.mask_permafrost_dir, self.mask_permafrost_file, self.mask_permafrost_varname)
         self.mask_karst_data, self.sim_lon, self.sim_lat = self._read_mask_karst(self.mask_karst_dir, self.mask_karst_file, self.mask_karst_varname, self.mask_karst_resample)
         self.forcing_var1_data = self._read_forcing_var1(self.forcing_var1_dir, self.forcing_var1_file, self.forcing_var1_varname, self.forcing_var1_resample)
+        self.extpar_var1_data = self._read_extpar_var1(self.extpar_var1_dir, self.extpar_var1_file, self.extpar_var1_varname, self.extpar_var1_resample)
   
     def _read_sim_var1(self, pn: str, fn: str, varname: str, regr: int) -> np.ndarray:
 
@@ -298,6 +313,26 @@ class simAuxData:
         # h-1 -> m/h  -> m/year ->  mm / year
         return data *  0.02 * 365. * 24.  * 1000.
 
+    def _read_extpar_var1(self, pn: str, fn: str, varname: str, regr: int) -> np.ndarray:
+
+        ds = xr.open_dataset(pn+"/"+fn)    
+        if regr == 0:
+            #data = ds[varname].values
+            data = ds[varname].isel(z=0, time=0).values
+        if regr == 1:
+            # resample, factor 4 along x and y axes
+            # align the number of datapoints with the nnumber of pixels to print
+            # data contains NaN
+            data = ds[varname].isel(z=0, time=0)
+            datac = data.coarsen(x=4, y=4, boundary='exact', side='left').mean()
+            del data
+            data = datac.values
+
+        #print('min', np.nanmin(data))
+        #print('max', np.nanmax(data))
+
+        return data
+
 def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileformat):
     """
     Visualize data, plot on map, interactive display and/or write to image file.
@@ -363,6 +398,8 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
             data = data_obj.sim_var2_data[:, :]
         case "Reff":
             data = data_obj.forcing_var1_data[:, :]
+        case "hydrofacies":
+            data = data_obj.extpar_var1_data[:, :]
         case _:
             print("plottype does not exist, exiting script")
             sys.exit()
@@ -428,10 +465,14 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
                           25,30,35,40,45,50]  # non-linear custom, need to align with ParFlow dz
             norm = BoundaryNorm(levelsVals, ncolors=cmapDiscr.N, clip=True)
         case "Reff":
-            levelsVals = np.logspace(-1, 3, num=50, base=10.0)  # logarithmic [1e-8 ... 1e-2]
+            levelsVals = np.logspace(-1, 3, num=50, base=10.0)
             N = len(levelsVals) - 1
             cmapDiscr = plt.get_cmap('turbo_r', N+2)
             norm = BoundaryNorm(levelsVals, ncolors=N+2, clip=False)
+        case "hydrofacies":
+            cmapDiscr = plt.get_cmap('gist_ncar_r', 22)
+            levelsVals = np.arange(23)
+            norm = BoundaryNorm(levelsVals, ncolors=cmapDiscr.N, clip=True)
         case _:
             print("plottype does not exist, exiting script")
             sys.exit()
@@ -528,6 +569,11 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
             cb.set_ticks([1.e-01, 1.e+00, 1.e+01, 1.e+02, 1.e+03])
             cb.set_ticklabels(['10$^{-1}$','10$^{0}$','10$^{1}$','10$^{2}$','10$^{3}$'])
             cb.set_label('Effective recharge [mm year$^{-1}$]', fontsize=6, fontweight='bold')
+        case "hydrofacies":
+            cb = plt.colorbar(plt_data_grid, ax=ax1, extend='neither', pad=0.007, shrink=0.2, drawedges=True, 
+                           orientation='horizontal', ticks=[0.5, 3.5, 6.5, 9.5, 12.5, 15.5, 18.5, 21.5])
+            cb.set_ticklabels(['1', '4', '7', '10', '13', '16', '19', '22'])
+            cb.set_label('Hydrofacies, bottom layer', fontsize=6, fontweight='bold')
         case _:
             print("plottype does not exist, exiting script")
             sys.exit()
@@ -541,7 +587,7 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
             match plottype:
                 case "Sr" | "WTD":
                     new_pos = [pos.x0 - 0.3, pos.y0 + 0.075, pos.width, pos.height]
-                case "Reff":
+                case "Reff" | "hydrofacies":
                     new_pos = [pos.x0 - 0.3, pos.y0 + 0.09, pos.width, pos.height]
         case "southAmerica1":
             new_pos = [pos.x0 + 0.05, pos.y0 + 0.098, pos.width, pos.height]
@@ -632,7 +678,8 @@ def main():
                       dir_data+"/"+"plotdata_manuscript_SKo_links", "output_mask1x1.nc", "mask", 1,
                       dir_data+"/"+"masking_permafrost_isimip", "isimip2b_clm45_permafrost_mask_2005_3m.nc", "mask",
                       dir_data+"/"+"masking_carst-glaciated_indicator-gleeson", "global_gleeson_porosity_008333.nc", "Gleeson", 1,
-                      dir_data+"/"+"plotdata_manuscript_SKo_links", "meanforcing.nc", "evaptrans", 1)
+                      dir_data+"/"+"plotdata_manuscript_SKo_links", "meanforcing.nc", "evaptrans", 1,
+                      dir_data+"/"+"plotdata_manuscript_SKo_links", "indicator.nc", "indicator", 1)
 
     time_intermediate = time.time()
     print('exec wallclock time reading and processing =  %0.3f s' % (time_intermediate - time_start)) 
@@ -641,18 +688,26 @@ def main():
 
     # add: , interactiveplot=False
     # manually activate / deactivate
+    pn_fn_image_output = plot_2D_map(data_obj, plottype="hydrofacies", mapfocus="global", size="pagewidth",
+        pn_out="./", fn_out="JHX_KolletEtAl_ParFlowGlobal_Fig1_hydrofacies", fileformat="pdf")
+
     pn_fn_image_output = plot_2D_map(data_obj, plottype="Reff", mapfocus="global", size="pagewidth",
-        pn_out="./", fn_out="test_Reff_2", fileformat="pdf")
-    #pn_fn_image_output = plot_2D_map(data_obj, plottype="Sr", mapfocus="global", size="pagewidth",
-    #    pn_out="./", fn_out="test_sat_3", fileformat="pdf")
-    #pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="global", size="pagewidth",
-    #    pn_out="./", fn_out="test_wtd_4a", fileformat="pdf")
-    #pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="southAmerica1", size="pagewidth",
-    #    pn_out="./", fn_out="test_wtd_4b", fileformat="pdf")
-    #pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="southAmerica2", size="pagewidth",
-    #    pn_out="./", fn_out="test_wtd_4b_poster", fileformat="pdf")
-    #pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="europe", size="pagewidth",
-    #    pn_out="./", fn_out="test_euroope_website", fileformat="pdf")
+        pn_out="./", fn_out="JHX_KolletEtAl_ParFlowGlobal_Fig2_Reff", fileformat="pdf")
+    
+    pn_fn_image_output = plot_2D_map(data_obj, plottype="Sr", mapfocus="global", size="pagewidth",
+        pn_out="./", fn_out="JHX_KolletEtAl_ParFlowGlobal_Fig3_Sr", fileformat="pdf")
+    
+    pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="global", size="pagewidth",
+        pn_out="./", fn_out="JHX_KolletEtAl_ParFlowGlobal_Fig4a_WTD", fileformat="pdf")
+    
+    pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="southAmerica1", size="pagewidth",
+        pn_out="./", fn_out="JHX_KolletEtAl_ParFlowGlobal_Fig4b_WTD_SouthAmerica", fileformat="pdf")
+    
+    pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="southAmerica2", size="pagewidth",
+        pn_out="./", fn_out="JHX_KolletEtAl_ParFlowGlobal_poster_WTD_SouthAmerica", fileformat="pdf")
+    
+    pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="europe", size="pagewidth",
+        pn_out="./", fn_out="JHX_KolletEtAl_ParFlowGlobal_website_WTD_Europe", fileformat="pdf")
 
     print('exec wallclock time plotting  =  %0.3f s' % (time.time() - time_intermediate)) 
 
