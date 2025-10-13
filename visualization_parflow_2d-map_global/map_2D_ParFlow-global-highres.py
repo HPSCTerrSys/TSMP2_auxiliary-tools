@@ -22,10 +22,15 @@ Ouputs:
 Notes:
 Plot size, data set size in grid elements, map scale, dpi, image file format are
 adjusted with each other. Also the viewer makes a difference.
+- Fig3 Sr + global
+- Fig4a WTD + global
+- Fig4b WTD + southAmerica1
+- Fig4b_poster WTD + southAmerica2
+- Fig EoCoE WTD + europe
 
 Limitations:
-Currently only Fig3 from Kollet et al., plottype='Sr', is implemented, other
-plots will follow.
+Currently figures 3, 4a, 4b from Kollet et al. are implemented. 
+Other plots will follow.
 May need manual code edits, especially in `main`. 
 
 Operating environment:
@@ -354,19 +359,24 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
     ax1.set_aspect('equal')
     ax1.set_global()
     ax1.coastlines(resolution="10m", color='gray', linewidth=0.075)
+    match mapfocus:
+        case "southAmerica2" | "europe":
+            ax1.add_feature(cfeature.OCEAN, facecolor='midnightblue')
  
     # minimum number of gridlines
-    gl_main = ax1.gridlines(draw_labels=False, linewidth=0.1, color="dimgray", linestyle="-", alpha=0.5)
-    gl_main.xlocator = FixedLocator([0])  # Greenwich
-    gl_main.ylocator = FixedLocator([0])  # Equator
-    gl_extra = ax1.gridlines(draw_labels=False, linewidth=0.1, color="dimgray", linestyle="--")
-    gl_extra.xlocator = FixedLocator([-180, -90, 90, 180])
-    gl_extra.ylocator = FixedLocator([-45, 45])
+    match mapfocus:
+        case "global" | "southAmerica1":
+            gl_main = ax1.gridlines(draw_labels=False, linewidth=0.1, color="dimgray", linestyle="-", alpha=0.5)
+            gl_main.xlocator = FixedLocator([0])  # Greenwich
+            gl_main.ylocator = FixedLocator([0])  # Equator
+            gl_extra = ax1.gridlines(draw_labels=False, linewidth=0.1, color="dimgray", linestyle="--")
+            gl_extra.xlocator = FixedLocator([-180, -90, 90, 180])
+            gl_extra.ylocator = FixedLocator([-45, 45])
 
     # thin map border
     ax1.spines['geo'].set_linewidth(0.5)
 
-    ax1.set_title('ParFlow IHM (GPU), 43200x17400@0.00833deg (approx. 1km), resampled to 4x4km^2', fontsize=7)
+    #ax1.set_title('ParFlow IHM (GPU), 43200x17400@0.00833deg (approx. 1km), resampled to 4x4km^2', fontsize=7)
 
     match plottype:
         case "Sr":
@@ -436,8 +446,19 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
     #plt_mask_ocean_grid = ax1.imshow(mask3, extent=[mask2_lon.min(), mask2_lon.max(), mask2_lat.min(), mask2_lat.max()], origin="lower", transform=crs_data, alpha=0.5, cmap=ListedColormap(['none', 'red']) ) #, vmin=0.0, vmax=0.01)
 
     # map extend
-    plt.xlim(-180, 180)
-    plt.ylim(-60, 85)
+    match mapfocus:
+        case "global":
+            plt.xlim(-180, 180)
+            plt.ylim(-60, 85)
+        case "europe":
+            plt.xlim(-25, 40)
+            plt.ylim(30, 72)
+        case "southAmerica1":
+            plt.xlim(-95, 32)
+            plt.ylim(-51, 15)
+        case "southAmerica2":
+            plt.xlim(-85, -9)
+            plt.ylim(-36, 14)
 
     # thin colorbar
     match plottype:
@@ -450,7 +471,13 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
             cb = plt.colorbar(plt_data_grid, ax=ax1, extend='max', pad=0.007, shrink=0.2, drawedges=False, 
                              orientation='horizontal', ticks=[1, 3, 10, 50])
             cb.set_ticklabels(['1', '3', '<10\nshallow', '50\ndeep'])
-            cb.set_label('Water table depth [m]', fontsize=6, fontweight='bold')
+            match mapfocus:
+                case "global" | "southAmerica1":
+                    cb.set_label('Water table depth [m]', fontsize=6, fontweight='bold')
+                case "southAmerica2" | "europe":
+                    cb.ax.tick_params(color="whitesmoke", labelcolor="whitesmoke")
+                    cb.set_label('Water table depth [m]\nParFlow IHM, 1km global', fontsize=6, fontweight='bold', color='whitesmoke')
+                    cb.outline.set_edgecolor("whitesmoke")
         case _:
             print("plottype does not exist, exiting script")
             sys.exit()
@@ -458,7 +485,15 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
     cb.ax.tick_params(labelsize=6)
     # re-position the color bar
     pos = cb.ax.get_position()
-    new_pos = [pos.x0 - 0.3, pos.y0 + 0.075, pos.width, pos.height]
+    match mapfocus:
+        case "global":
+            new_pos = [pos.x0 - 0.3, pos.y0 + 0.075, pos.width, pos.height]
+        case "southAmerica1":
+            new_pos = [pos.x0 + 0.05, pos.y0 + 0.098, pos.width, pos.height]
+        case "southAmerica2":
+            new_pos = [pos.x0 + 0.25, pos.y0 + 0.098, pos.width, pos.height]
+        case "europe":
+            new_pos = [pos.x0 - 0.3, pos.y0 + 0.125, pos.width, pos.height]
     cb.ax.set_position(new_pos)
 
     # add sub-figure label
@@ -466,36 +501,59 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
 
     # add custom legends, permafrost, karst, glacier
     # width/height in degrees
-    rect0 = Rectangle((-175, -10), 7, 3.5, facecolor="snow", alpha=1.0, edgecolor="black", linewidth=0.3)
-    ax1.add_patch(rect0)
-    rect0.set_zorder(100)
-    ax1.text(-175 + 7.8, -10 + 1.6, "Glaciated regions", va="center", ha="left", fontsize=6)
+    match mapfocus:
+        case "global":
+            lonstart = -175.
+            latstart =  -10.
+            boxheight = 3.5
+            boxwidth = 7.
+            txtlonstart = 7.8
+            txtlatstart = 1.6
+            latoffset = -6
+        case "southAmerica1":
+            lonstart = -36.
+            latstart = -28.
+            boxheight = 1.8
+            boxwidth = 4.5
+            txtlonstart = 5
+            txtlatstart = 0.8
+            latoffset = -3
 
-    rect1 = Rectangle((-175, -16), 7, 3.5, facecolor="white", alpha=1.0, edgecolor="black", linewidth=0.3)
-    ax1.add_patch(rect1)
-    rect1.set_zorder(100)
-    #rect11 = Rectangle((-175, -16), 7, 3.5, facecolor="dodgerblue", alpha=0.3, edgecolor="black", linewidth=0.3)
-    #ax1.add_patch(rect11)
-    #rect11.set_zorder(101)
-    rect12 = Rectangle((-175, -16), 7, 3.5, facecolor="none", alpha=1.0, edgecolor="black", linewidth=0.2, hatch='XXXXXXXXX') # dimgrey
-    #rect12 = Rectangle((-175, -16), 7, 3.5, facecolor="none", alpha=1.0, edgecolor="dimgrey", linewidth=0.3, hatch='///////')
-    ax1.add_patch(rect12)
-    rect12.set_zorder(102)
-    rect13 = Rectangle((-175, -16), 7, 3.5, facecolor="none", alpha=1.0, edgecolor="black", linewidth=0.3)
-    ax1.add_patch(rect13)
-    rect13.set_zorder(103)
-    ax1.text(-175 + 7.8, -16 + 1.6, "Permafrost regions", va="center", ha="left", fontsize=6)
+    match mapfocus:
+        case "global" | "southAmerica1":
+            # glaciers
+            rect0 = Rectangle((lonstart, latstart + latoffset * 0.), boxwidth, boxheight, facecolor="snow", alpha=1.0, edgecolor="black", linewidth=0.3)
+            ax1.add_patch(rect0)
+            rect0.set_zorder(100)
+            ax1.text(lonstart + txtlonstart, latstart + latoffset * 0. + txtlatstart, "Glaciated regions", va="center", ha="left", fontsize=6)
 
-    rect2 = Rectangle((-175, -22), 7, 3.5, facecolor="white", alpha=1.0, edgecolor="black", linewidth=0.3)
-    ax1.add_patch(rect2)
-    rect2.set_zorder(100)
-    rect21 = Rectangle((-175, -22), 7, 3.5, facecolor="slategrey", alpha=0.6, edgecolor="black", linewidth=0.3)
-    ax1.add_patch(rect21)
-    rect21.set_zorder(101)
-    rect22 = Rectangle((-175, -22), 7, 3.5, facecolor="none", alpha=1.0, edgecolor="black", linewidth=0.3)
-    ax1.add_patch(rect22)
-    rect22.set_zorder(102)
-    ax1.text(-175 + 7.8, -22 + 1.6, "Karst rock", va="center", ha="left", fontsize=6)
+            # permafrost
+            rect1 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="white", alpha=1.0, edgecolor="black", linewidth=0.3)
+            ax1.add_patch(rect1)
+            rect1.set_zorder(100)
+            #rect11 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="dodgerblue", alpha=0.3, edgecolor="black", linewidth=0.3)
+            #ax1.add_patch(rect11)
+            #rect11.set_zorder(101)
+            rect12 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="none", alpha=1.0, edgecolor="black", linewidth=0.2, hatch='XXXXXXXXX') # dimgrey
+            #rect12 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="none", alpha=1.0, edgecolor="dimgrey", linewidth=0.3, hatch='///////')
+            ax1.add_patch(rect12)
+            rect12.set_zorder(102)
+            rect13 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="none", alpha=1.0, edgecolor="black", linewidth=0.3)
+            ax1.add_patch(rect13)
+            rect13.set_zorder(103)
+            ax1.text(lonstart + txtlonstart, latstart + latoffset * 1. + txtlatstart, "Permafrost regions", va="center", ha="left", fontsize=6)
+
+            # karst
+            rect2 = Rectangle((lonstart, latstart + latoffset * 2.), boxwidth, boxheight, facecolor="white", alpha=1.0, edgecolor="black", linewidth=0.3)
+            ax1.add_patch(rect2)
+            rect2.set_zorder(100)
+            rect21 = Rectangle((lonstart, latstart + latoffset * 2.), boxwidth, boxheight, facecolor="slategrey", alpha=0.6, edgecolor="black", linewidth=0.3)
+            ax1.add_patch(rect21)
+            rect21.set_zorder(101)
+            rect22 = Rectangle((lonstart, latstart + latoffset * 2.), boxwidth, boxheight, facecolor="none", alpha=1.0, edgecolor="black", linewidth=0.3)
+            ax1.add_patch(rect22)
+            rect22.set_zorder(102)
+            ax1.text(lonstart + txtlonstart, latstart + latoffset * 2. + txtlatstart, "Karst rock", va="center", ha="left", fontsize=6)
 
     # 300 600 1200 2400
     fig1.savefig(pn_out+"/"+fn_out+"."+fileformat, bbox_inches='tight', pad_inches=0.1, dpi=1200)
@@ -524,10 +582,17 @@ def main():
     #sys.exit()
 
     # add: , interactiveplot=False
-    pn_fn_image_output = plot_2D_map(data_obj, plottype="Sr", mapfocus="global", size="pagewidth",
-        pn_out="./", fn_out="test_sat_3", fileformat="pdf")
-    pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="global", size="pagewidth",
-        pn_out="./", fn_out="test_wtd_4a", fileformat="pdf")
+    # manually activate / deactivate
+    #pn_fn_image_output = plot_2D_map(data_obj, plottype="Sr", mapfocus="global", size="pagewidth",
+    #    pn_out="./", fn_out="test_sat_3", fileformat="pdf")
+    #pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="global", size="pagewidth",
+    #    pn_out="./", fn_out="test_wtd_4a", fileformat="pdf")
+    #pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="southAmerica1", size="pagewidth",
+    #    pn_out="./", fn_out="test_wtd_4b", fileformat="pdf")
+    #pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="southAmerica2", size="pagewidth",
+    #    pn_out="./", fn_out="test_wtd_4b_poster", fileformat="pdf")
+    pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="europe", size="pagewidth",
+        pn_out="./", fn_out="test_euroope_website", fileformat="pdf")
 
     print('exec wallclock time plotting  =  %0.3f s' % (time.time() - time_intermediate)) 
 
