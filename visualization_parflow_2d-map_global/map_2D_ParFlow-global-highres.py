@@ -317,7 +317,15 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
     """
 
     # sim data, ParFlow sim data
-    data = data_obj.sim_var1_data[:, :]
+    match plottype:
+        case "Sr":
+            data = data_obj.sim_var1_data[:, :]
+        case "WTD":
+            data = data_obj.sim_var2_data[:, :]
+        case _:
+            print("plottype does not exist, exiting script")
+            sys.exit()
+    # coordinates
     data_lon = mask2_lon = mask4_lon = data_obj.sim_lon[:]
     data_lat = mask2_lat = mask4_lat = data_obj.sim_lat[:]
     # permafrost, ISIMIP data, coarse resolution
@@ -360,13 +368,20 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
 
     ax1.set_title('ParFlow IHM (GPU), 43200x17400@0.00833deg (approx. 1km), resampled to 4x4km^2', fontsize=7)
 
-    cmapDiscr = plt.get_cmap('Spectral', 50)
-    levelsVals = np.linspace(0, 1, 51) # linear / logarithmic
-    #levelsVals = [0,0.025,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0, 
-    #              1.2,1.4,1.6,1.8,2.0,2.2,2.4,2.6,2.8,3.0, 
-    #              3.5,4.5,5.0,5.5,6,
-    #              7,8,9,10,11,12,13,14,15,16,17,18,19,20,
-    #              25,30,35,40,45,50]  # non-linear custom, need to align with ParFlow dz
+    match plottype:
+        case "Sr":
+            cmapDiscr = plt.get_cmap('Spectral', 50)
+            levelsVals = np.linspace(0, 1, 51) # linear / logarithmic
+        case "WTD":
+            cmapDiscr = plt.get_cmap('Spectral_r', 50)
+            levelsVals = [0,0.025,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0, 
+                          1.2,1.4,1.6,1.8,2.0,2.2,2.4,2.6,2.8,3.0, 
+                          3.5,4.5,5.0,5.5,6,
+                          7,8,9,10,11,12,13,14,15,16,17,18,19,20,
+                          25,30,35,40,45,50]  # non-linear custom, need to align with ParFlow dz
+        case _:
+            print("plottype does not exist, exiting script")
+            sys.exit()
     #print(len(levelsVals))
     norm = BoundaryNorm(levelsVals, ncolors=cmapDiscr.N, clip=True)
 
@@ -425,12 +440,22 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
     plt.ylim(-60, 85)
 
     # thin colorbar
-    cb = plt.colorbar(plt_data_grid, ax=ax1, extend='neither', pad=0.007, shrink=0.2, drawedges=False, 
-                       orientation='horizontal', ticks=np.linspace(0, 1, 11))
-    cb.ax.tick_params(labelsize=6)
-    cb.set_ticklabels(['0.0','\ndry','','','','0.5','','','','\nwet','1.0'])
-    cb.set_label('Relative saturation [-]', fontsize=6, fontweight='bold')
+    match plottype:
+        case "Sr":
+            cb = plt.colorbar(plt_data_grid, ax=ax1, extend='neither', pad=0.007, shrink=0.2, drawedges=False, 
+                            orientation='horizontal', ticks=np.linspace(0, 1, 11))
+            cb.set_ticklabels(['0.0','\ndry','','','','0.5','','','','\nwet','1.0'])
+            cb.set_label('Relative saturation [-]', fontsize=6, fontweight='bold')
+        case "WTD":
+            cb = plt.colorbar(plt_data_grid, ax=ax1, extend='max', pad=0.007, shrink=0.2, drawedges=False, 
+                             orientation='horizontal', ticks=[1, 3, 10, 50])
+            cb.set_ticklabels(['1', '3', '<10\nshallow', '50\ndeep'])
+            cb.set_label('Water table depth [m]', fontsize=6, fontweight='bold')
+        case _:
+            print("plottype does not exist, exiting script")
+            sys.exit()
     cb.outline.set_linewidth(0.3)
+    cb.ax.tick_params(labelsize=6)
     # re-position the color bar
     pos = cb.ax.get_position()
     new_pos = [pos.x0 - 0.3, pos.y0 + 0.075, pos.width, pos.height]
@@ -496,11 +521,13 @@ def main():
     time_intermediate = time.time()
     print('exec wallclock time reading and processing =  %0.3f s' % (time_intermediate - time_start)) 
 
-    sys.exit()
+    #sys.exit()
 
     # add: , interactiveplot=False
     pn_fn_image_output = plot_2D_map(data_obj, plottype="Sr", mapfocus="global", size="pagewidth",
-        pn_out="./", fn_out="test", fileformat="pdf")
+        pn_out="./", fn_out="test_sat_3", fileformat="pdf")
+    pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="global", size="pagewidth",
+        pn_out="./", fn_out="test_wtd_4a", fileformat="pdf")
 
     print('exec wallclock time plotting  =  %0.3f s' % (time.time() - time_intermediate)) 
 

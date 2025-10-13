@@ -2,6 +2,7 @@ data_test_geo.*
 *bak*
 *examples*
 test.pdf
+test*
 .DS_Store
 dev
 *code-workspace*
