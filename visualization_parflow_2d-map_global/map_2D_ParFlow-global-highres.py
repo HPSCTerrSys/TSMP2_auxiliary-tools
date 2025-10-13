@@ -25,8 +25,8 @@ adjusted with each other. Also the viewer makes a difference.
 - Fig3 Sr + global
 - Fig4a WTD + global
 - Fig4b WTD + southAmerica1
-- Fig4b_poster WTD + southAmerica2
-- Fig EoCoE WTD + europe
+- Fig4b_poster WTD + southAmerica2 -- some poster vis, less map content
+- Fig EoCoE WTD + europe -- some website vis, less map content
 
 Limitations:
 Currently figures 3, 4a, 4b from Kollet et al. are implemented. 
@@ -67,7 +67,7 @@ __maintainer__ = "Klaus GOERGEN"
 __copyright__ = "Copyright (c) 2025, https://www.fz-juelich.de (FZJ)"
 __license__ = "MIT"
 __version__ = "1.0.0"
-__date__ = "2025-10-09"
+__date__ = "2025-10-13"
 __status__ = "Beta"
 __credits__ = [
     "Stefan KOLLET",
