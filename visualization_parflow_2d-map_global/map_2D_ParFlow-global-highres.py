@@ -22,6 +22,7 @@ Ouputs:
 Notes:
 Plot size, data set size in grid elements, map scale, dpi, image file format are
 adjusted with each other. Also the viewer makes a difference.
+- Fig2 Reff + global -- ongoing implementation
 - Fig3 Sr + global
 - Fig4a WTD + global
 - Fig4b WTD + southAmerica1
@@ -139,6 +140,11 @@ class simAuxData:
     mask_karst_data: np.ndarray = field(init=False)
     sim_lon: np.ndarray = field(init=False)
     sim_lat: np.ndarray = field(init=False)
+    forcing_var1_dir: str
+    forcing_var1_file: str
+    forcing_var1_varname: str
+    forcing_var1_resample: int
+    forcing_var1_data: np.ndarray = field(init=False)
 
     def __post_init__(self):
         self.sim_var1_data = self._read_sim_var1(self.sim_var1_dir, self.sim_var1_file, self.sim_var1_varname, self.sim_var1_resample)
@@ -146,6 +152,7 @@ class simAuxData:
         self.mask_landsea_data = self._read_mask_landsea(self.mask_landsea_dir, self.mask_landsea_file, self.mask_landsea_varname, self.mask_landsea_resample)
         self.mask_permafrost_data, self.mask_permafrost_lon, self.mask_permafrost_lat = self._read_mask_permafrost(self.mask_permafrost_dir, self.mask_permafrost_file, self.mask_permafrost_varname)
         self.mask_karst_data, self.sim_lon, self.sim_lat = self._read_mask_karst(self.mask_karst_dir, self.mask_karst_file, self.mask_karst_varname, self.mask_karst_resample)
+        self.forcing_var1_data = self._read_forcing_var1(self.forcing_var1_dir, self.forcing_var1_file, self.forcing_var1_varname, self.forcing_var1_resample)
   
     def _read_sim_var1(self, pn: str, fn: str, varname: str, regr: int) -> np.ndarray:
 
@@ -264,6 +271,33 @@ class simAuxData:
 
         return mask, lon, lat
 
+    def _read_forcing_var1(self, pn: str, fn: str, varname: str, regr: int) -> np.ndarray:
+
+        ds = xr.open_dataset(pn+"/"+fn, decode_times=False)
+        if regr == 0:
+            data = ds[varname].values
+            print('data basic:', data.shape)
+        if regr == 1:
+            # resample, factor 4 along x and y axes
+            # align the number of datapoints with the nnumber of pixels to print
+            # data contains no NaN
+            # min -1e-10
+            # max 0.028552477762256483
+            # must be m / day
+            data = ds[varname].isel(nz=14, time=0)
+            datac = data.coarsen(nx=4, ny=4, boundary='exact', side='left').mean()
+            #print('data: ', data.shape)
+            #print('datac: ', datac.shape)
+            del data
+            data = datac.values
+
+            #print('min', np.nanmin(data))
+            #print('max', np.nanmax(data))
+            #print('mean', np.nanmean(data))
+
+        # h-1 -> m/h  -> m/year ->  mm / year
+        return data *  0.02 * 365. * 24.  * 1000.
+
 def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileformat):
     """
     Visualize data, plot on map, interactive display and/or write to image file.
@@ -327,6 +361,8 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
             data = data_obj.sim_var1_data[:, :]
         case "WTD":
             data = data_obj.sim_var2_data[:, :]
+        case "Reff":
+            data = data_obj.forcing_var1_data[:, :]
         case _:
             print("plottype does not exist, exiting script")
             sys.exit()
@@ -382,6 +418,7 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
         case "Sr":
             cmapDiscr = plt.get_cmap('Spectral', 50)
             levelsVals = np.linspace(0, 1, 51) # linear / logarithmic
+            norm = BoundaryNorm(levelsVals, ncolors=cmapDiscr.N, clip=True)
         case "WTD":
             cmapDiscr = plt.get_cmap('Spectral_r', 50)
             levelsVals = [0,0.025,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0, 
@@ -389,11 +426,16 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
                           3.5,4.5,5.0,5.5,6,
                           7,8,9,10,11,12,13,14,15,16,17,18,19,20,
                           25,30,35,40,45,50]  # non-linear custom, need to align with ParFlow dz
+            norm = BoundaryNorm(levelsVals, ncolors=cmapDiscr.N, clip=True)
+        case "Reff":
+            levelsVals = np.logspace(-1, 3, num=50, base=10.0)  # logarithmic [1e-8 ... 1e-2]
+            N = len(levelsVals) - 1
+            cmapDiscr = plt.get_cmap('turbo_r', N+2)
+            norm = BoundaryNorm(levelsVals, ncolors=N+2, clip=False)
         case _:
             print("plottype does not exist, exiting script")
             sys.exit()
     #print(len(levelsVals))
-    norm = BoundaryNorm(levelsVals, ncolors=cmapDiscr.N, clip=True)
 
     # sim results plotting
     # use lon lat from indicator, this is precise 
@@ -411,39 +453,41 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
     #     #norm=LogNorm(vmin=levelsVals[0]+0.01, vmax=levelsVals[-1]))  # logarithmic
     plt_data_grid.set_rasterized(True) # does not make it much better but also not worse
 
-    # mask permafrost form ISIMIP
-    #plt_mask_permafrost_grid = ax1.imshow(mask1, extent=[mask1_lon.min(), mask1_lon.max(), mask1_lat.min(), mask1_lat.max()], 
-    #                           origin="upper", transform=crs_data, alpha=0.3, cmap=ListedColormap(['none', 'dodgerblue']), zorder=70)  #, vmin=0.5, vmax=1)  # better
-    plt.rcParams['hatch.linewidth'] = 0.10  # 0.2
-    plt_mask_permafrost_cont = ax1.contourf(mask1_lon, mask1_lat, mask1, levels=[0.5, 1.5], 
-                               origin="upper", transform=crs_data, zorder=71, colors="none", hatches=["XXXXXXXXXXXXXXX"], alpha=0) #, 7 10 / linewidth=0.01)
-                               #origin="upper", transform=crs_data, zorder=71, colors="none", hatches=["/////////////////"], alpha=0) #, 7 10 / linewidth=0.01)
-    for collection in plt_mask_permafrost_cont.collections:
-        collection.set_edgecolor("black")  # this sets hatch line color # dimgrey
-        #collection.set_linewidth(0.05)   # hatch thickness
+    match plottype:
+        case "Sr" | "WTD":
+            # mask permafrost form ISIMIP
+            #plt_mask_permafrost_grid = ax1.imshow(mask1, extent=[mask1_lon.min(), mask1_lon.max(), mask1_lat.min(), mask1_lat.max()], 
+            #                           origin="upper", transform=crs_data, alpha=0.3, cmap=ListedColormap(['none', 'dodgerblue']), zorder=70)  #, vmin=0.5, vmax=1)  # better
+            plt.rcParams['hatch.linewidth'] = 0.10  # 0.2
+            plt_mask_permafrost_cont = ax1.contourf(mask1_lon, mask1_lat, mask1, levels=[0.5, 1.5], 
+                                       origin="upper", transform=crs_data, zorder=71, colors="none", hatches=["XXXXXXXXXXXXXXX"], alpha=0) #, 7 10 / linewidth=0.01)
+                                       #origin="upper", transform=crs_data, zorder=71, colors="none", hatches=["/////////////////"], alpha=0) #, 7 10 / linewidth=0.01)
+            for collection in plt_mask_permafrost_cont.collections:
+                collection.set_edgecolor("black")  # this sets hatch line color # dimgrey
+                #collection.set_linewidth(0.05)   # hatch thickness
 
-    # mask glacier from somewhere, coarse resolution perhaps, fit in to ISIMIP
-    shapes = shapereader.Reader('/p/data1/slts/shared_data/collection_ParFlow-global_misc-sources/masking_glaciers_NaturalEarthData/ne_10m_glaciated_areas/ne_10m_glaciated_areas.shp')
-    shape_feature = cfeature.ShapelyFeature(shapes.geometries(), crs_data, 
-                    edgecolor='snow', linewidth=0.01, facecolor='snow', alpha=1.0, zorder=98)
-    ax1.add_feature(shape_feature)
+            # mask glacier from somewhere, coarse resolution perhaps, fit in to ISIMIP
+            shapes = shapereader.Reader('/p/data1/slts/shared_data/collection_ParFlow-global_misc-sources/masking_glaciers_NaturalEarthData/ne_10m_glaciated_areas/ne_10m_glaciated_areas.shp')
+            shape_feature = cfeature.ShapelyFeature(shapes.geometries(), crs_data, 
+                            edgecolor='snow', linewidth=0.01, facecolor='snow', alpha=1.0, zorder=98)
+            ax1.add_feature(shape_feature)
 
-    # mask carstic regions from indicator
-    # either overplot with transparency -> large areas
-    # or plot as scattered points, but then need thin out much further -> too many dots otherwise
-    plt_mask_karst_grid = ax1.imshow(mask4, extent=[mask4_lon.min(), mask4_lon.max(), mask4_lat.min(), mask4_lat.max()], 
-                          origin="lower", transform=crs_data, alpha=0.6, cmap=ListedColormap(['none', 'slategrey']), zorder=80)
-    # ax.scatter(lon, lat, color='red', edgecolor='black', s=100, marker='*', transform=crs_data, zorder=5)  # needs more handling of lon and lat
+            # mask carstic regions from indicator
+            # either overplot with transparency -> large areas
+            # or plot as scattered points, but then need thin out much further -> too many dots otherwise
+            plt_mask_karst_grid = ax1.imshow(mask4, extent=[mask4_lon.min(), mask4_lon.max(), mask4_lat.min(), mask4_lat.max()], 
+                                  origin="lower", transform=crs_data, alpha=0.6, cmap=ListedColormap(['none', 'slategrey']), zorder=80)
+            # ax.scatter(lon, lat, color='red', edgecolor='black', s=100, marker='*', transform=crs_data, zorder=5)  # needs more handling of lon and lat
 
-    # mask glacier from indicator file
-    # does not look OK, too small glaciated area, overlay rather needs to be a bit bigger to show on the world map 
-    # fits wel when overlaid with the Natural Earth data though
-    #plt_mask_glacier_grid = ax1.imshow(mask2, extent=[mask2_lon.min(), mask2_lon.max(), mask2_lat.min(), mask2_lat.max()], 
-    #                        origin="lower", transform=crs_data, alpha=0.8, cmap=ListedColormap(['none', 'purple']), zorder=99)
+            # mask glacier from indicator file
+            # does not look OK, too small glaciated area, overlay rather needs to be a bit bigger to show on the world map 
+            # fits wel when overlaid with the Natural Earth data though
+            #plt_mask_glacier_grid = ax1.imshow(mask2, extent=[mask2_lon.min(), mask2_lon.max(), mask2_lat.min(), mask2_lat.max()], 
+            #                        origin="lower", transform=crs_data, alpha=0.8, cmap=ListedColormap(['none', 'purple']), zorder=99)
 
-    # check land ocean lakes mask, can always be overplotted
-    # mask is binary [0,1]
-    #plt_mask_ocean_grid = ax1.imshow(mask3, extent=[mask2_lon.min(), mask2_lon.max(), mask2_lat.min(), mask2_lat.max()], origin="lower", transform=crs_data, alpha=0.5, cmap=ListedColormap(['none', 'red']) ) #, vmin=0.0, vmax=0.01)
+            # check land ocean lakes mask, can always be overplotted
+            # mask is binary [0,1]
+            #plt_mask_ocean_grid = ax1.imshow(mask3, extent=[mask2_lon.min(), mask2_lon.max(), mask2_lat.min(), mask2_lat.max()], origin="lower", transform=crs_data, alpha=0.5, cmap=ListedColormap(['none', 'red']) ) #, vmin=0.0, vmax=0.01)
 
     # map extend
     match mapfocus:
@@ -478,16 +522,27 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
                     cb.ax.tick_params(color="whitesmoke", labelcolor="whitesmoke")
                     cb.set_label('Water table depth [m]\nParFlow IHM, 1km global', fontsize=6, fontweight='bold', color='whitesmoke')
                     cb.outline.set_edgecolor("whitesmoke")
+        case "Reff":
+            cb = plt.colorbar(plt_data_grid, ax=ax1, extend='both', pad=0.007, shrink=0.2, boundaries=levelsVals, spacing='uniform',
+                            orientation='horizontal') #, format=LogFormatterSciNotation(base=10, labelOnlyBase=True)) 
+            cb.set_ticks([1.e-01, 1.e+00, 1.e+01, 1.e+02, 1.e+03])
+            cb.set_ticklabels(['10$^{-1}$','10$^{0}$','10$^{1}$','10$^{2}$','10$^{3}$'])
+            cb.set_label('Effective recharge [mm year$^{-1}$]', fontsize=6, fontweight='bold')
         case _:
             print("plottype does not exist, exiting script")
             sys.exit()
     cb.outline.set_linewidth(0.3)
     cb.ax.tick_params(labelsize=6)
+
     # re-position the color bar
     pos = cb.ax.get_position()
     match mapfocus:
         case "global":
-            new_pos = [pos.x0 - 0.3, pos.y0 + 0.075, pos.width, pos.height]
+            match plottype:
+                case "Sr" | "WTD":
+                    new_pos = [pos.x0 - 0.3, pos.y0 + 0.075, pos.width, pos.height]
+                case "Reff":
+                    new_pos = [pos.x0 - 0.3, pos.y0 + 0.09, pos.width, pos.height]
         case "southAmerica1":
             new_pos = [pos.x0 + 0.05, pos.y0 + 0.098, pos.width, pos.height]
         case "southAmerica2":
@@ -521,39 +576,41 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
 
     match mapfocus:
         case "global" | "southAmerica1":
-            # glaciers
-            rect0 = Rectangle((lonstart, latstart + latoffset * 0.), boxwidth, boxheight, facecolor="snow", alpha=1.0, edgecolor="black", linewidth=0.3)
-            ax1.add_patch(rect0)
-            rect0.set_zorder(100)
-            ax1.text(lonstart + txtlonstart, latstart + latoffset * 0. + txtlatstart, "Glaciated regions", va="center", ha="left", fontsize=6)
+            match plottype:
+                case "Sr" | "WTD":
+                    # glaciers
+                    rect0 = Rectangle((lonstart, latstart + latoffset * 0.), boxwidth, boxheight, facecolor="snow", alpha=1.0, edgecolor="black", linewidth=0.3)
+                    ax1.add_patch(rect0)
+                    rect0.set_zorder(100)
+                    ax1.text(lonstart + txtlonstart, latstart + latoffset * 0. + txtlatstart, "Glaciated regions", va="center", ha="left", fontsize=6)
 
-            # permafrost
-            rect1 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="white", alpha=1.0, edgecolor="black", linewidth=0.3)
-            ax1.add_patch(rect1)
-            rect1.set_zorder(100)
-            #rect11 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="dodgerblue", alpha=0.3, edgecolor="black", linewidth=0.3)
-            #ax1.add_patch(rect11)
-            #rect11.set_zorder(101)
-            rect12 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="none", alpha=1.0, edgecolor="black", linewidth=0.2, hatch='XXXXXXXXX') # dimgrey
-            #rect12 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="none", alpha=1.0, edgecolor="dimgrey", linewidth=0.3, hatch='///////')
-            ax1.add_patch(rect12)
-            rect12.set_zorder(102)
-            rect13 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="none", alpha=1.0, edgecolor="black", linewidth=0.3)
-            ax1.add_patch(rect13)
-            rect13.set_zorder(103)
-            ax1.text(lonstart + txtlonstart, latstart + latoffset * 1. + txtlatstart, "Permafrost regions", va="center", ha="left", fontsize=6)
+                    # permafrost
+                    rect1 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="white", alpha=1.0, edgecolor="black", linewidth=0.3)
+                    ax1.add_patch(rect1)
+                    rect1.set_zorder(100)
+                    #rect11 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="dodgerblue", alpha=0.3, edgecolor="black", linewidth=0.3)
+                    #ax1.add_patch(rect11)
+                    #rect11.set_zorder(101)
+                    rect12 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="none", alpha=1.0, edgecolor="black", linewidth=0.2, hatch='XXXXXXXXX') # dimgrey
+                    #rect12 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="none", alpha=1.0, edgecolor="dimgrey", linewidth=0.3, hatch='///////')
+                    ax1.add_patch(rect12)
+                    rect12.set_zorder(102)
+                    rect13 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor="none", alpha=1.0, edgecolor="black", linewidth=0.3)
+                    ax1.add_patch(rect13)
+                    rect13.set_zorder(103)
+                    ax1.text(lonstart + txtlonstart, latstart + latoffset * 1. + txtlatstart, "Permafrost regions", va="center", ha="left", fontsize=6)
 
-            # karst
-            rect2 = Rectangle((lonstart, latstart + latoffset * 2.), boxwidth, boxheight, facecolor="white", alpha=1.0, edgecolor="black", linewidth=0.3)
-            ax1.add_patch(rect2)
-            rect2.set_zorder(100)
-            rect21 = Rectangle((lonstart, latstart + latoffset * 2.), boxwidth, boxheight, facecolor="slategrey", alpha=0.6, edgecolor="black", linewidth=0.3)
-            ax1.add_patch(rect21)
-            rect21.set_zorder(101)
-            rect22 = Rectangle((lonstart, latstart + latoffset * 2.), boxwidth, boxheight, facecolor="none", alpha=1.0, edgecolor="black", linewidth=0.3)
-            ax1.add_patch(rect22)
-            rect22.set_zorder(102)
-            ax1.text(lonstart + txtlonstart, latstart + latoffset * 2. + txtlatstart, "Karst rock", va="center", ha="left", fontsize=6)
+                    # karst
+                    rect2 = Rectangle((lonstart, latstart + latoffset * 2.), boxwidth, boxheight, facecolor="white", alpha=1.0, edgecolor="black", linewidth=0.3)
+                    ax1.add_patch(rect2)
+                    rect2.set_zorder(100)
+                    rect21 = Rectangle((lonstart, latstart + latoffset * 2.), boxwidth, boxheight, facecolor="slategrey", alpha=0.6, edgecolor="black", linewidth=0.3)
+                    ax1.add_patch(rect21)
+                    rect21.set_zorder(101)
+                    rect22 = Rectangle((lonstart, latstart + latoffset * 2.), boxwidth, boxheight, facecolor="none", alpha=1.0, edgecolor="black", linewidth=0.3)
+                    ax1.add_patch(rect22)
+                    rect22.set_zorder(102)
+                    ax1.text(lonstart + txtlonstart, latstart + latoffset * 2. + txtlatstart, "Karst rock", va="center", ha="left", fontsize=6)
 
     # 300 600 1200 2400
     fig1.savefig(pn_out+"/"+fn_out+"."+fileformat, bbox_inches='tight', pad_inches=0.1, dpi=1200)
@@ -574,7 +631,8 @@ def main():
                       dir_data+"/"+"plotdata_manuscript_SKo_links", "wtd1x1.nc", "wtd", 1,
                       dir_data+"/"+"plotdata_manuscript_SKo_links", "output_mask1x1.nc", "mask", 1,
                       dir_data+"/"+"masking_permafrost_isimip", "isimip2b_clm45_permafrost_mask_2005_3m.nc", "mask",
-                      dir_data+"/"+"masking_carst-glaciated_indicator-gleeson", "global_gleeson_porosity_008333.nc", "Gleeson", 1)
+                      dir_data+"/"+"masking_carst-glaciated_indicator-gleeson", "global_gleeson_porosity_008333.nc", "Gleeson", 1,
+                      dir_data+"/"+"plotdata_manuscript_SKo_links", "meanforcing.nc", "evaptrans", 1)
 
     time_intermediate = time.time()
     print('exec wallclock time reading and processing =  %0.3f s' % (time_intermediate - time_start)) 
@@ -583,6 +641,8 @@ def main():
 
     # add: , interactiveplot=False
     # manually activate / deactivate
+    pn_fn_image_output = plot_2D_map(data_obj, plottype="Reff", mapfocus="global", size="pagewidth",
+        pn_out="./", fn_out="test_Reff_2", fileformat="pdf")
     #pn_fn_image_output = plot_2D_map(data_obj, plottype="Sr", mapfocus="global", size="pagewidth",
     #    pn_out="./", fn_out="test_sat_3", fileformat="pdf")
     #pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="global", size="pagewidth",
@@ -591,8 +651,8 @@ def main():
     #    pn_out="./", fn_out="test_wtd_4b", fileformat="pdf")
     #pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="southAmerica2", size="pagewidth",
     #    pn_out="./", fn_out="test_wtd_4b_poster", fileformat="pdf")
-    pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="europe", size="pagewidth",
-        pn_out="./", fn_out="test_euroope_website", fileformat="pdf")
+    #pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="europe", size="pagewidth",
+    #    pn_out="./", fn_out="test_euroope_website", fileformat="pdf")
 
     print('exec wallclock time plotting  =  %0.3f s' % (time.time() - time_intermediate)) 
 
