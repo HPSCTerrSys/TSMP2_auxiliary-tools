@@ -16,23 +16,17 @@ Python script(s) to visualize global ParFlow IHM simulation results at 1km grid 
 
 - [map_2D_ParFlow-global-highres.py](visualization_parflow_2d-map_global/map_2D_ParFlow-global-highres.py): Read all necessary data into a dataclass object and provide visualisation for different variables and spatial subsets. Deliberately not a generic script, but tailored to the plots as used in Kollet al al. (under review, JHX).
 
-## [map_2d_trigrid_vis_modularized_LAM.py](real-cordex/map_2d_trigrid_vis_modularized_LAM.py)
+## [visualization_and_handling_of_TSMP2-sim-outputs](visualization_and_handling_of_TSMP2-sim-outputs/)
 
-Python script to visualize TSMP2 model output (from ICON or eCLM) on its native icosahedral (triangular) grid on a map for generic variables as well special cases for terrain,
-pft and soiltexture.
+These are scriptsi and the accompagnying software environment under `env/` (`source <inifile>` on JSC HPC systems), to work with TSMP2 simulation results, primarily in the context of the TSMP2 introduction by Poll et al. (to be submitted to GMDD).
 
-## [plot_ico_2dfield_fast.ipynb](real-cordex/plot_ico_2dfield_fast.ipynb)
+- [map_2d_trigrid_vis_modularized_LAM.py](real-cordex/map_2d_trigrid_vis_modularized_LAM.py): Python script to visualize TSMP2 model output (from ICON or eCLM) on its native icosahedral (triangular) grid on a map for generic variables as well special cases for terrain, pft and soiltexture.
 
-Python Juypter notebook to visualize ICON data on its native icosahedral grid. Different approach and projection compared to map_2d_trigrid_vis_modularized_LAM.py.
+- [plot_ico_2dfield_fast.ipynb](real-cordex/plot_ico_2dfield_fast.ipynb): Python Juypter notebook to visualize ICON data on its native icosahedral grid. Different approach and projection compared to `map_2d_trigrid_vis_modularized_LAM.py`.
 
-## [InputAnalysis.py](real-cordex/InputAnalysis.py)
+- [InputAnalysis.py](real-cordex/InputAnalysis.py): Python script to visualize CLM input data on a curvilinear grid. 
 
-Python script to visualize CLM input data on a curvilinear grid. 
+- [TSMP2_fs-idealnwp_visualization.ipynb](ideal-fs/TSMP2_fs-idealnwp_visualization.ipynb): Python Juypter notebook to investigate fs-idealnwp case.
 
-## [TSMP2_fs-idealnwp_visualization.ipynb](ideal-fs/TSMP2_fs-idealnwp_visualization.ipynb)
+- [convert_phead2volsoilmoist.py](ideal-fs/convert_phead2volsoilmoist.py): Python script convert pressure from ParFlow to volumetric soil moisture and relative saturation.
 
-Python Juypter notebook to investigate fs-idealnwp case.
-
-## [convert_phead2volsoilmoist.py](ideal-fs/convert_phead2volsoilmoist.py)
-
-Python script convert pressure from ParFlow to volumetric soil moisture and relative saturation.
