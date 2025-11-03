@@ -15,3 +15,24 @@ Python scripts (based on widely-used libraries, such as matplotlib, cartopy, xar
 Python script(s) to visualize global ParFlow IHM simulation results at 1km grid spacing on a map.  
 
 - [map_2D_ParFlow-global-highres.py](visualization_parflow_2d-map_global/map_2D_ParFlow-global-highres.py): Read all necessary data into a dataclass object and provide visualisation for different variables and spatial subsets. Deliberately not a generic script, but tailored to the plots as used in Kollet al al. (under review, JHX).
+
+## [map_2d_trigrid_vis_modularized_LAM.py](real-cordex/map_2d_trigrid_vis_modularized_LAM.py)
+
+Python script to visualize TSMP2 model output (from ICON or eCLM) on its native icosahedral (triangular) grid on a map for generic variables as well special cases for terrain,
+pft and soiltexture.
+
+## [plot_ico_2dfield_fast.ipynb](real-cordex/plot_ico_2dfield_fast.ipynb)
+
+Python Juypter notebook to visualize ICON data on its native icosahedral grid. Different approach and projection compared to map_2d_trigrid_vis_modularized_LAM.py.
+
+## [InputAnalysis.py](real-cordex/InputAnalysis.py)
+
+Python script to visualize CLM input data on a curvilinear grid. 
+
+## [TSMP2_fs-idealnwp_visualization.ipynb](ideal-fs/TSMP2_fs-idealnwp_visualization.ipynb)
+
+Python Juypter notebook to investigate fs-idealnwp case.
+
+## [convert_phead2volsoilmoist.py](ideal-fs/convert_phead2volsoilmoist.py)
+
+Python script convert pressure from ParFlow to volumetric soil moisture and relative saturation.
