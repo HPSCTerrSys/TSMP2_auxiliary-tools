@@ -14,7 +14,7 @@ Inputs:
 - Locally stored compilation of global datasets.
 - ParFlow simulation results and diagnostics. Differ in netCDF structure and attributes.
 - ParFlow external parameter files.
-- Additional data from external sources: glacier mask, permafrost mask.
+- Additional data from external sources: glacier mask, permafrost mask, karst and karstic regions.
 - All data is stored here: `/p/data1/slts/shared_data/collection_ParFlow-global_misc-sources`
 
 Ouputs:
@@ -33,15 +33,17 @@ The following combinations are implemented:
 - Fig3 Sr + global
 - Fig4a WTD + global
 - Fig4b WTD + southAmerica1
+- Fig5 additional overlay, ice sheets and glaciers, permafrost, karst and karstic systems
 - Fig poster WTD + southAmerica2 -- some poster vis, less map content
 - Fig EoCoE WTD + europe -- some website vis, less map content
 Total runtime about 4min.
 
 Limitations:
 - May need manual code edits, especially in `main`. 
-- Shape-file is not yet part of the data object.
+- Shape-files arenot yet part of the data object.
 - "fullres" size, works, but not yet implemented as an option.
 - Adjustable resampling not yet implemented.
+- Some redundant pieces of code for legacy reasons still included, like karst from hydrofacies
 
 Operating environment:
 - locally with conda forge env (tested), or
@@ -62,10 +64,12 @@ from matplotlib.colors import LogNorm
 from matplotlib.colors import BoundaryNorm
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.patches import Rectangle
+import matplotlib.cm as cm
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from cartopy.io import shapereader
+import cartopy.io.img_tiles as cimgt
 
 from dataclasses import dataclass, field
 
@@ -77,7 +81,7 @@ __maintainer__ = "Klaus GOERGEN"
 __copyright__ = "Copyright (c) 2025, https://www.fz-juelich.de (FZJ)"
 __license__ = "MIT"
 __version__ = "1.0.0"
-__date__ = "2025-11-19"
+__date__ = "2025-11-24"
 __status__ = "Production"
 __credits__ = [
     "Stefan KOLLET",
@@ -378,6 +382,7 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
         - 'WTD': for water table depth [m]
         - 'Reff': for effective recharge [mm year-1] 
         - 'hydrofacies': for hydrofacies distribution [hydrofacies class]
+        - 'Ol': overlays (external data) (glaciers + ice sheets, permafrost, karst + karstic systems)
 
     mapfocus : {'global', 'europe', 'southAmerica1', 'southAmerica2'}
         Area of the globe to be shown. This is purely done by adjusting the map extent. The extent
@@ -426,9 +431,9 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
             data = data_obj.forcing_var1_data[:, :]
         case "hydrofacies":
             data = data_obj.extpar_var1_data[:, :]
-        case _:
-            print("plottype does not exist, exiting script")
-            sys.exit()
+        #case _:
+        #    print("plottype does not exist, exiting script")
+        #    sys.exit()
     # coordinates
     data_lon = mask2_lon = mask4_lon = data_obj.sim_lon[:]
     data_lat = mask2_lat = mask4_lat = data_obj.sim_lat[:]
@@ -461,6 +466,9 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
     match mapfocus:
         case "southAmerica2" | "europe":
             ax1.add_feature(cfeature.OCEAN, facecolor='midnightblue')
+    #lakes = cfeature.LAKES.with_scale('10m')  # options: '110m', '50m', '10m'
+    #ax1.add_feature(lakes, edgecolor='darkgreen', linewidth=0.075)
+    #ax1.add_feature(cfeature.RIVERS.with_scale('10m'), edgecolor='blue', linewidth=0.2)
  
     # minimum number of gridlines
     match mapfocus:
@@ -499,27 +507,30 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
             cmapDiscr = plt.get_cmap('gist_ncar_r', 22)
             levelsVals = np.arange(23)
             norm = BoundaryNorm(levelsVals, ncolors=cmapDiscr.N, clip=True)
-        case _:
-            print("plottype does not exist, exiting script")
-            sys.exit()
+        #case _:
+        #    print("plottype does not exist, exiting script")
+        #    sys.exit()
     #print(len(levelsVals))
 
-    # sim results plotting
-    # use lon lat from indicator, this is precise 
-    # masked with land sea mask
-    data[mask3 == 0.] = np.nan
-    # contourf and pcolormesh are no option, take way too long
-    # values below / above vmin / vmax are assigned to the lowest / highest color
-    plt_data_grid = ax1.imshow(data, 
-        extent=[mask2_lon.min(), mask2_lon.max(), 
-                mask2_lat.min(), mask2_lat.max()], 
-        origin="lower", transform=crs_data,
-        cmap=cmapDiscr,
-        visible=True,
-        norm=norm)  # arbitrary  
-    #     #vmin=levelsVals[0], vmax=levelsVals[-1])  # linear
-    #     #norm=LogNorm(vmin=levelsVals[0]+0.01, vmax=levelsVals[-1]))  # logarithmic
-    plt_data_grid.set_rasterized(True) # does not make it much better but also not worse
+    if plottype != "Ol":
+        # sim results plotting
+        # use lon lat from indicator, this is precise 
+        # masked with land sea mask
+        data[mask3 == 0.] = np.nan
+        # contourf and pcolormesh are no option, take way too long
+        # values below / above vmin / vmax are assigned to the lowest / highest color
+        plt_data_grid = ax1.imshow(data, 
+            extent=[mask2_lon.min(), mask2_lon.max(), 
+                    mask2_lat.min(), mask2_lat.max()], 
+            origin="lower", transform=crs_data,
+            cmap=cmapDiscr,
+            visible=True,
+            norm=norm)  # arbitrary  
+        #     #vmin=levelsVals[0], vmax=levelsVals[-1])  # linear
+        #     #norm=LogNorm(vmin=levelsVals[0]+0.01, vmax=levelsVals[-1]))  # logarithmic
+        plt_data_grid.set_rasterized(True) # does not make it much better but also not worse
+    else:
+        print("just plot overlays")
 
     match plottype:
         case "Sr" | "WTD":
@@ -538,7 +549,7 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
             #                           origin="upper", transform=crs_data, zorder=71, colors="#c7dbe6", alpha=0.7)
 
             # mask glacier from somewhere, coarse resolution perhaps, fit in to ISIMIP
-            shapes = shapereader.Reader('/p/data1/slts/shared_data/collection_ParFlow-global_misc-sources/masking_glaciers_NaturalEarthData/o.data/ne_10m_glaciated_areas.shp')
+            shapes = shapereader.Reader('/p/data1/slts/shared_data/collection_ParFlow-global_misc-sources/masking_glaciers-GLIMS_NSIDC/p.data.aggregated/ne_10m_glaciated_areas.shp')
             shape_feature = cfeature.ShapelyFeature(shapes.geometries(), crs_data, 
                             edgecolor='deepskyblue', linewidth=0.01, facecolor='deepskyblue', alpha=0.5, zorder=80)    # snow
             ax1.add_feature(shape_feature)
@@ -567,6 +578,44 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
             # check land ocean lakes mask, can always be overplotted
             # mask is binary [0,1]
             #plt_mask_ocean_grid = ax1.imshow(mask3, extent=[mask2_lon.min(), mask2_lon.max(), mask2_lat.min(), mask2_lat.max()], origin="lower", transform=crs_data, alpha=0.5, cmap=ListedColormap(['none', 'red']) ) #, vmin=0.0, vmax=0.01)
+
+        case "Ol":
+            plt_mask_permafrost_grid = ax1.imshow(mask1, extent=[mask1_lon.min(), mask1_lon.max(), mask1_lat.min(), mask1_lat.max()], 
+                                       origin="lower", transform=crs_data, alpha=0.5, cmap=ListedColormap(['none', (0.37, 0.25, 0.48)]), zorder=79, vmin=0.7, vmax=100)  # cadetblue
+           
+            shapes = shapereader.Reader('/p/data1/slts/shared_data/collection_ParFlow-global_misc-sources/masking_glaciers_NaturalEarthData/o.data/ne_10m_glaciated_areas.shp')
+            shape_feature = cfeature.ShapelyFeature(shapes.geometries(), crs_data, 
+                            edgecolor='deepskyblue', linewidth=0.01, facecolor='deepskyblue', alpha=0.9, zorder=80)    # snow
+            ax1.add_feature(shape_feature)
+
+            # rock type = 1 carbonate rock continuous
+            shapes_whymap = shapereader.Reader('/p/data1/slts/shared_data/collection_ParFlow-global_misc-sources/masking_additional-data-WHYMAP-karst_BGR/o.data/shp/whymap_karst__v1_poly.shp')
+            filtered_geometries1 = [rec.geometry for rec in shapes_whymap.records() if rec.attributes.get("rock_type") == 1]
+            custom_feature1 = cfeature.ShapelyFeature(filtered_geometries1, crs_data, edgecolor=[(0.42, 0.60, 0.83)], linewidth=0.01, facecolor=[(0.42, 0.60, 0.83)], alpha=1.0, zorder=78)
+            ax1.add_feature(custom_feature1)
+            # rock type = 2 carbonate rock discontinuous
+            filtered_geometries2 = [rec.geometry for rec in shapes_whymap.records() if rec.attributes.get("rock_type") == 2]
+            custom_feature2 = cfeature.ShapelyFeature(filtered_geometries2, crs_data, edgecolor=[(0.67, 0.85, 0.89)], linewidth=0.01, facecolor=[(0.67, 0.85, 0.89)], alpha=1.0, zorder=78)
+            ax1.add_feature(custom_feature2)
+            # rock type = 3 continuous evaporite rocks 
+            filtered_geometries3 = [rec.geometry for rec in shapes_whymap.records() if rec.attributes.get("rock_type") == 3]
+            custom_feature3 = cfeature.ShapelyFeature(filtered_geometries3, crs_data, edgecolor=[(0.90, 0.55, 0.71)], linewidth=0.01, facecolor=[(0.90, 0.55, 0.71)], alpha=1.0, zorder=78)
+            ax1.add_feature(custom_feature3)
+            # rock type = 4 discontinuous evporite rocks
+            filtered_geometries4 = [rec.geometry for rec in shapes_whymap.records() if rec.attributes.get("rock_type") == 4]
+            custom_feature4 = cfeature.ShapelyFeature(filtered_geometries4, crs_data, edgecolor=[(0.60, 0.85, 0.55)], linewidth=0.01, facecolor=[(0.60, 0.85, 0.55)], alpha=1.0, zorder=78)
+            ax1.add_feature(custom_feature4)
+            # rock type = 5 mixed carbonate and evaporite rocks
+            filtered_geometries5 = [rec.geometry for rec in shapes_whymap.records() if rec.attributes.get("rock_type") == 5]
+            custom_feature5 = cfeature.ShapelyFeature(filtered_geometries5, crs_data, edgecolor=[(0.98, 0.86, 0.49)], linewidth=0.01, facecolor=[(0.98, 0.86, 0.49)], alpha=1.0, zorder=78)
+            ax1.add_feature(custom_feature5)
+
+            #stamen_terrain = cimgt.Stamen('terrain-background')
+            #ax1.add_image(stamen_terrain, zoom=1, extent=[-180, 180, -60, 85])
+            #img_relief = ax1.background_img(name='natural-earth', resolution='low')
+            ##img_relief = ax1.stock_img()
+            ##img_relief.set_cmap(cm.gray)
+            #ax1.stock_img()
 
     # map extend
     match mapfocus:
@@ -612,28 +661,30 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
                            orientation='horizontal', ticks=[0.5, 3.5, 6.5, 9.5, 12.5, 15.5, 18.5, 21.5])
             cb.set_ticklabels(['1', '4', '7', '10', '13', '16', '19', '22'])
             cb.set_label('Hydrofacies, bottom layer', fontsize=6, fontweight='bold')
-        case _:
-            print("plottype does not exist, exiting script")
-            sys.exit()
-    cb.outline.set_linewidth(0.3)
-    cb.ax.tick_params(labelsize=6)
-
-    # re-position the color bar
-    pos = cb.ax.get_position()
-    match mapfocus:
-        case "global":
-            match plottype:
-                case "Sr" | "WTD":
-                    new_pos = [pos.x0 - 0.3, pos.y0 + 0.075, pos.width, pos.height]
-                case "Reff" | "hydrofacies":
-                    new_pos = [pos.x0 - 0.3, pos.y0 + 0.09, pos.width, pos.height]
-        case "southAmerica1":
-            new_pos = [pos.x0 + 0.05, pos.y0 + 0.098, pos.width, pos.height]
-        case "southAmerica2":
-            new_pos = [pos.x0 + 0.25, pos.y0 + 0.098, pos.width, pos.height]
-        case "europe":
-            new_pos = [pos.x0 - 0.3, pos.y0 + 0.125, pos.width, pos.height]
-    cb.ax.set_position(new_pos)
+#        case _:
+#            print("plottype does not exist, exiting script")
+#            sys.exit()
+    match plottype:
+        case "Sr" | "WTD" | "Reff" | "hydrofacies":
+            cb.outline.set_linewidth(0.3)
+            cb.ax.tick_params(labelsize=6)
+        
+            # re-position the color bar
+            pos = cb.ax.get_position()
+            match mapfocus:
+                case "global":
+                    match plottype:
+                        case "Sr" | "WTD":
+                            new_pos = [pos.x0 - 0.3, pos.y0 + 0.075, pos.width, pos.height]
+                        case "Reff" | "hydrofacies":
+                            new_pos = [pos.x0 - 0.3, pos.y0 + 0.09, pos.width, pos.height]
+                case "southAmerica1":
+                    new_pos = [pos.x0 + 0.05, pos.y0 + 0.098, pos.width, pos.height]
+                case "southAmerica2":
+                    new_pos = [pos.x0 + 0.25, pos.y0 + 0.098, pos.width, pos.height]
+                case "europe":
+                    new_pos = [pos.x0 - 0.3, pos.y0 + 0.125, pos.width, pos.height]
+            cb.ax.set_position(new_pos)
 
     # add sub-figure label
     #ax1.text(0.015, 0.96,'b)',transform=ax1.transAxes,fontsize=8,fontweight="bold",va="top", ha="left")
@@ -657,6 +708,9 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
             txtlonstart = 5
             txtlatstart = 0.8
             latoffset = -3
+
+    if plottype == "Ol":
+        latstart = -6
 
     match mapfocus:
         case "global" | "southAmerica1":
@@ -699,6 +753,46 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
                     ax1.add_patch(rect2)
                     rect2.set_zorder(100)
                     ax1.text(lonstart + txtlonstart, latstart + latoffset * 2. + txtlatstart, "Karst, karstic systems", va="center", ha="left", fontsize=6)
+
+                case "Ol":
+
+                    # ice sheets, glaciers
+                    rect0 = Rectangle((lonstart, latstart + latoffset * 0.), boxwidth, boxheight, facecolor="deepskyblue", alpha=1.0, edgecolor="black", linewidth=0.3)
+                    ax1.add_patch(rect0)
+                    rect0.set_zorder(100)
+                    ax1.text(lonstart + txtlonstart, latstart + latoffset * 0. + txtlatstart, "Ice sheets, glaciers", va="center", ha="left", fontsize=6)
+
+                    # permafrost
+                    rect1 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor=(0.37, 0.25, 0.48), alpha=1.0, edgecolor="black", linewidth=0.3)
+                    ax1.add_patch(rect1)
+                    rect1.set_zorder(100)
+                    ax1.text(lonstart + txtlonstart, latstart + latoffset * 1. + txtlatstart, "Permafrost", va="center", ha="left", fontsize=6)
+
+                    # karst, karstic systems
+                    rect2 = Rectangle((lonstart, latstart + latoffset * 2.), boxwidth, boxheight, facecolor=(0.42, 0.60, 0.83), alpha=1.0, edgecolor="black", linewidth=0.3)
+                    ax1.add_patch(rect2)
+                    rect2.set_zorder(100)
+                    ax1.text(lonstart + txtlonstart, latstart + latoffset * 2. + txtlatstart, "Carbonate rocks, continuous", va="center", ha="left", fontsize=6)
+                    
+                    rect3 = Rectangle((lonstart, latstart + latoffset * 3.), boxwidth, boxheight, facecolor=(0.67, 0.85, 0.89), alpha=1.0, edgecolor="black", linewidth=0.3)
+                    ax1.add_patch(rect3)
+                    rect3.set_zorder(100)
+                    ax1.text(lonstart + txtlonstart, latstart + latoffset * 3. + txtlatstart, "Carbonate rocks, discontinuous", va="center", ha="left", fontsize=6)
+
+                    rect4 = Rectangle((lonstart, latstart + latoffset * 4.), boxwidth, boxheight, facecolor=(0.90, 0.55, 0.71), alpha=1.0, edgecolor="black", linewidth=0.3)
+                    ax1.add_patch(rect4)
+                    rect4.set_zorder(100)
+                    ax1.text(lonstart + txtlonstart, latstart + latoffset * 4. + txtlatstart, "Evaporite rocks, continuous", va="center", ha="left", fontsize=6)
+
+                    rect5 = Rectangle((lonstart, latstart + latoffset * 5.), boxwidth, boxheight, facecolor=(0.60, 0.85, 0.55), alpha=1.0, edgecolor="black", linewidth=0.3)
+                    ax1.add_patch(rect5)
+                    rect5.set_zorder(100)
+                    ax1.text(lonstart + txtlonstart, latstart + latoffset * 5. + txtlatstart, "Evaporite rocks, discontinuous", va="center", ha="left", fontsize=6)
+
+                    rect6 = Rectangle((lonstart, latstart + latoffset * 6.), boxwidth, boxheight, facecolor=(0.98, 0.86, 0.49), alpha=1.0, edgecolor="black", linewidth=0.3)
+                    ax1.add_patch(rect6)
+                    rect6.set_zorder(100)
+                    ax1.text(lonstart + txtlonstart, latstart + latoffset * 6. + txtlatstart, "Mixed carbonate and evaporite rocks", va="center", ha="left", fontsize=6)
 
     # 300 600 1200 2400
     #os.makedirs(pn_out, exist_ok=True)
@@ -746,6 +840,9 @@ def main():
     pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="southAmerica1", size="pagewidth",
         pn_out="./", fn_out="JHX_KolletEtAl_ParFlowGlobal_Fig4b_WTD_SouthAmerica_r2", fileformat="pdf")
     
+    pn_fn_image_output = plot_2D_map(data_obj, plottype="Ol", mapfocus="global", size="pagewidth",
+        pn_out="./", fn_out="JHX_KolletEtAl_ParFlowGlobal_Fig5_MaterialMethods-AddMapLayers_r2", fileformat="pdf")
+
     pn_fn_image_output = plot_2D_map(data_obj, plottype="WTD", mapfocus="southAmerica2", size="pagewidth",
         pn_out="./", fn_out="JHX_KolletEtAl_ParFlowGlobal_poster_WTD_SouthAmerica", fileformat="pdf")
     
