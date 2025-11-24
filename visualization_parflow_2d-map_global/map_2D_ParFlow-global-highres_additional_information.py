@@ -700,7 +700,7 @@ def plot_2D_map(data_obj, *, plottype, mapfocus, size, pn_out, fn_out, fileforma
                     rect0 = Rectangle((lonstart, latstart + latoffset * 0.), boxwidth, boxheight, facecolor="deepskyblue", alpha=1.0, edgecolor="black", linewidth=0.3)
                     ax1.add_patch(rect0)
                     rect0.set_zorder(100)
-                    ax1.text(lonstart + txtlonstart, latstart + latoffset * 0. + txtlatstart, "Glaciated regions", va="center", ha="left", fontsize=6)
+                    ax1.text(lonstart + txtlonstart, latstart + latoffset * 0. + txtlatstart, "Ice sheets, glaciers", va="center", ha="left", fontsize=6)
 
                     # permafrost
                     rect1 = Rectangle((lonstart, latstart + latoffset * 1.), boxwidth, boxheight, facecolor=(0.37, 0.25, 0.48), alpha=1.0, edgecolor="black", linewidth=0.3)
