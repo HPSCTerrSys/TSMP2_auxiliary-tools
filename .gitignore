@@ -7,3 +7,4 @@ test*
 dev
 *code-workspace*
 tmp
+extra*
