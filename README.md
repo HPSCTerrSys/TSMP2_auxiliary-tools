@@ -30,3 +30,8 @@ These are scriptsi and the accompagnying software environment under `env/` (`sou
 
 - [convert_phead2volsoilmoist.py](ideal-fs/convert_phead2volsoilmoist.py): Python script convert pressure from ParFlow to volumetric soil moisture and relative saturation.
 
+## [datahandling_prepostprocessing_tsmp2](datahandling_prepostprocessing_tsmp2/)
+
+Shell script(s) to handle tsmp2 data for pre- and postprocessing.
+
+- [compress_extract_nc-files.sh](datahandling_prepostprocessing_tsmp2/compress_extract_nc-files.sh): Shell script to extract or compress netcdf data.
