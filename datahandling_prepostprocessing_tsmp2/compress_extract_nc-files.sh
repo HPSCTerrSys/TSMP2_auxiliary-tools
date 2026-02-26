@@ -5,7 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=128
 #SBATCH --job-name=nc-archive
-#SBATCH --time=07:25:00
+#SBATCH --time=01:25:00
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
 
@@ -66,7 +66,7 @@ case "$MODE" in
 
     echo "Untar finished, starting gunzip step..."
 
-    find . -type f -name "*.gz" -print0 \
+    find . -type f -name "*.nc.gz" -print0 \
       | xargs -0 -n 1 -P "$MAX_PARALLEL" gunzip
 
     ;;
